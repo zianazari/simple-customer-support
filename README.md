@@ -2,6 +2,14 @@
 
 A web-based email-triage application that classifies customer messages, routes actionable work to the appropriate department, and prepares an internal handoff email. It combines a Python/FastAPI backend, LangGraph workflow, OpenAI structured outputs, and a TypeScript/React chat interface.
 
+## Technology
+
+<p align="left">
+  <img src="https://skillicons.dev/icons?i=python,fastapi,react,typescript,vite,html,css&theme=dark" alt="Python, FastAPI, React, TypeScript, Vite, HTML, and CSS" />
+  <img src="https://img.shields.io/badge/LangGraph-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white" alt="LangGraph" />
+  <img src="https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white" alt="OpenAI" />
+</p>
+
 ## Features
 
 - Routes Support, Feedback, Spam, and Other messages through a LangGraph state machine.
@@ -13,6 +21,28 @@ A web-based email-triage application that classifies customer messages, routes a
 - Sends a message with `Enter`; use `Shift + Enter` to add a new line.
 
 The service prepares drafts only—it does not send external email. See [the workflow](docs/workflow.md), [architecture](docs/architecture.md), and [API reference](docs/api.md).
+
+## Workflow
+
+```mermaid
+flowchart TD
+    Start([Incoming email]) --> Classify[process-message]
+    Classify -->|Support| Support[process-support]
+    Classify -->|Feedback| Feedback[process-feedback]
+    Classify -->|Other| Other[process-other]
+    Classify -->|Spam| End([End])
+    Support -->|Bug| Bug[support-bug]
+    Support -->|Technical Question| Question[Technical Support]
+    Bug -->|Low / Medium| Engineering[Support Engineering]
+    Bug -->|High| Incident[Incident Response]
+    Feedback -->|Positive / Negative| Experience[Customer Experience]
+    Other --> End
+    Question --> Draft[draft-email]
+    Engineering --> Draft
+    Incident --> Draft
+    Experience --> Draft
+    Draft --> End
+```
 
 ## Interactive API documentation
 
