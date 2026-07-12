@@ -10,6 +10,10 @@ A web-based email-triage application that classifies customer messages, routes a
   <img src="https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white" alt="OpenAI" />
 </p>
 
+## User Interface
+
+<img src=img/ui.png alt="User interface" />
+
 ## Features
 
 - Routes Support, Feedback, Spam, and Other messages through a LangGraph state machine.
@@ -18,7 +22,6 @@ A web-based email-triage application that classifies customer messages, routes a
 - Uses Pydantic schemas and strict JSON-schema model responses for reliable workflow decisions.
 - Provides structured application logging and safe, actionable API error messages.
 - Includes a dark, responsive chat interface with animated processing feedback, example messages, and message/draft cards.
-- Sends a message with `Enter`; use `Shift + Enter` to add a new line.
 
 The service prepares drafts only—it does not send external email. See [the workflow](docs/workflow.md), [architecture](docs/architecture.md), and [API reference](docs/api.md).
 
