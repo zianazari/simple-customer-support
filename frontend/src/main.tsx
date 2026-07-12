@@ -9,7 +9,7 @@ type Result = {
   reason?: string;
   email?: { department: string; recipient: string; subject: string; body: string };
 };
-type Message = { role: "user" | "assistant"; content: string; result?: Result };
+type Message = { role: "user" | "assistant"; content: string; result?: Result; time?: number };
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 const EXAMPLES = [
@@ -18,18 +18,40 @@ const EXAMPLES = [
   "Our checkout page returns a 500 error for every customer.",
 ];
 
-function Sparkle() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 1.7 6.3L20 10l-6.3 1.7L12 18l-1.7-6.3L4 10l6.3-1.7L12 2Zm7 13 .8 3.2L23 19l-3.2.8L19 23l-.8-3.2L15 19l3.2-.8L19 15Z" /></svg>;
+function MarkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 4.5h16v10L17 19H7l-3-4.5v-10Z" />
+      <path d="M4 14.5h5.3a1 1 0 0 1 .9.55L11 17h2l.8-1.95a1 1 0 0 1 .9-.55H20" />
+    </svg>
+  );
 }
 
-function SendIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10.5 13.5M21 3l-6.7 18-3.8-7.5L3 9.7 21 3Z" /></svg>;
+function ArrowIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+function pad(n: number) {
+  return String(n).padStart(3, "0");
+}
+
+function classSlug(value: string) {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
+}
+
+function formatTime(ts?: number) {
+  if (!ts) return "";
+  return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
 function App() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: "Hello! Paste an incoming customer email and I’ll analyze it, route it, and prepare the right internal handoff." },
+    { role: "assistant", content: "Paste an incoming customer email below. It will be classified, routed to the right queue, and — where a handoff is needed — a draft note will be prepared for that team." },
   ]);
   const [waiting, setWaiting] = useState(false);
 
@@ -37,7 +59,7 @@ function App() {
     event.preventDefault();
     const text = input.trim();
     if (!text || waiting) return;
-    setMessages((items) => [...items, { role: "user", content: text }]);
+    setMessages((items) => [...items, { role: "user", content: text, time: Date.now() }]);
     setInput("");
     setWaiting(true);
     try {
@@ -50,11 +72,11 @@ function App() {
       if (!response.ok) throw new Error((result as { detail?: string }).detail ?? "Request failed");
       const typed = result as Result;
       const content = typed.status === "drafted"
-        ? `I’ve routed this as ${typed.classification}. The handoff draft is ready for ${typed.email?.department}.`
-        : `I’ve classified this as ${typed.classification}. It doesn’t need a department handoff.`;
-      setMessages((items) => [...items, { role: "assistant", content, result: typed }]);
+        ? `Classified as ${typed.classification}. Handoff prepared for ${typed.email?.department}.`
+        : `Classified as ${typed.classification}. No department handoff required.`;
+      setMessages((items) => [...items, { role: "assistant", content, result: typed, time: Date.now() }]);
     } catch (error) {
-      setMessages((items) => [...items, { role: "assistant", content: `I couldn’t process that email: ${(error as Error).message}` }]);
+      setMessages((items) => [...items, { role: "assistant", content: `Couldn’t process that ticket: ${(error as Error).message}`, time: Date.now() }]);
     } finally {
       setWaiting(false);
     }
@@ -67,47 +89,97 @@ function App() {
     }
   }
 
+  const ticketCount = messages.filter((message) => message.role === "user").length;
+  let ticketN = 0;
+
   return <main className="app-shell">
-    <section className="workspace" aria-label="Customer service email assistant">
-      <header className="topbar">
-        <div className="brand-mark"><Sparkle /></div>
-        <div className="title-block"><p className="eyebrow">CUSTOMER OPERATIONS</p><h1>Service Desk</h1></div>
-        <div className="online"><span></span> Workflow online</div>
+    <section className="console" aria-label="Customer service email triage console">
+      <header className="console-header">
+        <div className="brand">
+          <span className="brand-mark"><MarkIcon /></span>
+          <div className="brand-text">
+            <p className="brand-eyebrow">Atlas Operations</p>
+            <h1>Inbox Triage</h1>
+          </div>
+        </div>
+        <div className="header-meta">
+          <span className="env-tag">PRODUCTION</span>
+          <span className="live-tag"><i /> Live</span>
+        </div>
       </header>
 
-      <div className="conversation">
-        <div className="conversation-heading">
-          <div><h2>Email triage assistant</h2><p>Analyze, prioritize, and route incoming customer messages.</p></div>
-          <span className="secure">● Secure processing</span>
+      <div className="toolbar">
+        <div>
+          <h2>Ticket queue</h2>
+          <p>Paste an incoming customer email to classify, route, and draft the internal handoff.</p>
         </div>
-
-        <div className="messages" aria-live="polite">
-          {messages.map((message, index) => <article key={index} className={`message ${message.role}`}>
-            {message.role === "assistant" && <div className="avatar"><Sparkle /></div>}
-            <div className="bubble">
-              <p>{message.content}</p>
-              {message.result && <div className="analysis">
-                <div className="analysis-row"><span className="label">Classification</span><strong className={`route ${message.result.classification.toLowerCase()}`}>{message.result.classification}</strong></div>
-                {message.result.reason && <p className="reason">{message.result.reason}</p>}
-              </div>}
-              {message.result?.email && <div className="draft-card">
-                <div className="draft-title"><span>✦</span><strong>Department handoff ready</strong></div>
-                <dl><div><dt>To</dt><dd>{message.result.email.recipient}</dd></div><div><dt>Subject</dt><dd>{message.result.email.subject}</dd></div></dl>
-                <pre>{message.result.email.body}</pre>
-              </div>}
-            </div>
-          </article>)}
-          {waiting && <article className="message assistant loading"><div className="avatar"><Sparkle /></div><div className="bubble"><div className="thinking"><i></i><i></i><i></i><span>Analyzing and choosing the right route…</span></div></div></article>}
-        </div>
-
-        {messages.length === 1 && <div className="examples"><span>Try an example</span>{EXAMPLES.map((example) => <button key={example} type="button" onClick={() => setInput(example)}>{example}</button>)}</div>}
+        <div className="queue-count"><strong>{pad(ticketCount)}</strong><span>Processed</span></div>
       </div>
 
+      <div className="thread" aria-live="polite">
+        {messages.map((message, index) => {
+          if (message.role === "assistant" && index === 0) {
+            return <p key={index} className="system-note">{message.content}</p>;
+          }
+
+          if (message.role === "user") {
+            ticketN += 1;
+            return (
+              <article key={index} className="ticket-entry">
+                <div className="ticket-meta">
+                  <span className="ticket-id">TCK-{pad(ticketN)}</span>
+                  <span className="ticket-time">{formatTime(message.time)}</span>
+                  <span className="ticket-tag-in">Incoming</span>
+                </div>
+                <div className="ticket-body">{message.content}</div>
+              </article>
+            );
+          }
+
+          return (
+            <article key={index} className="routing-entry">
+              <p className="routing-summary">{message.content}</p>
+              {message.result && <div className="routing-line">
+                <strong className={`pill pill-${classSlug(message.result.classification)}`}>{message.result.classification}</strong>
+                {message.result.status === "drafted" && <span className="routing-arrow"><ArrowIcon /> {message.result.email?.department}</span>}
+              </div>}
+              {message.result?.reason && <p className="routing-reason">{message.result.reason}</p>}
+              {message.result?.status === "not_routed" && <p className="routing-note">Logged for records — no handoff needed.</p>}
+              {message.result?.email && <div className="handoff">
+                <div className="handoff-head">
+                  <span className="handoff-label">Internal handoff</span>
+                  <span className="handoff-dept">{message.result.email.department}</span>
+                </div>
+                <dl>
+                  <div><dt>To</dt><dd>{message.result.email.recipient}</dd></div>
+                  <div><dt>Subject</dt><dd>{message.result.email.subject}</dd></div>
+                </dl>
+                <pre>{message.result.email.body}</pre>
+              </div>}
+            </article>
+          );
+        })}
+        {waiting && <div className="processing-row"><span className="processing-dots"><i /><i /><i /></span>Classifying and routing…</div>}
+      </div>
+
+      {messages.length === 1 && <div className="samples">
+        <span className="samples-label">Sample tickets</span>
+        <div className="samples-list">
+          {EXAMPLES.map((example) => <button key={example} type="button" className="sample-chip" onClick={() => setInput(example)}>{example}</button>)}
+        </div>
+      </div>}
+
       <form className="composer" onSubmit={submit}>
-        <div className="input-wrap"><textarea aria-label="Incoming customer email" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={handleComposerKeyDown} placeholder="Paste an incoming customer email…" rows={3} maxLength={20000} /><span>{input.length.toLocaleString()} / 20,000</span></div>
-        <button className="send-button" disabled={waiting || !input.trim()}><span>{waiting ? "Processing" : "Analyze email"}</span><SendIcon /></button>
+        <div className="composer-field">
+          <textarea aria-label="Incoming customer email" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={handleComposerKeyDown} placeholder="Paste an incoming customer email…" rows={3} maxLength={20000} />
+          <span className="char-count">{input.length.toLocaleString()} / 20,000</span>
+        </div>
+        <button className="route-button" disabled={waiting || !input.trim()}>
+          <span>{waiting ? "Routing" : "Route email"}</span>
+          <ArrowIcon />
+        </button>
       </form>
-      <p className="privacy-note">Press <kbd>Enter</kbd> to analyze · <kbd>Shift</kbd> + <kbd>Enter</kbd> for a new line</p>
+      <p className="hint-row">Press <kbd>Enter</kbd> to route · <kbd>Shift</kbd> + <kbd>Enter</kbd> for a new line</p>
     </section>
   </main>;
 }
